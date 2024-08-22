@@ -77,38 +77,52 @@ def process():
     typeSearch = request.args.get('typeSearch')
 
     if typeSearch == '1':
-    
         disctCorretEnglish = {}
         disctCorretPortugues = {}
         UltTextEnglish = ''
         UltTextPortugues = ''
-    
-        for text in jsonListEnglish[0]:
-            if text[-1] == ":":
-                disctCorretEnglish[text] = []
-                UltText = text
-            else:
-                disctCorretEnglish[UltText].append(text)
-    
-        for text in jsonListPortugues[0]:
-            if text[-1] == ":":
-                disctCorretPortugues[text] = []
-                UltText = text
-            else:
-                disctCorretPortugues[UltText].append(text)
-    
-        for i, val in disctCorretEnglish.items():
-            if i == "Entry term(s):":
-                disctCorretPortugues[i] = val
-    
+
+        # Verifica se jsonListEnglish não está vazio antes de processar
+        if jsonListEnglish:
+            for text in jsonListEnglish[0]:
+                if text[-1] == ":":
+                    disctCorretEnglish[text] = []
+                    UltTextEnglish = text
+                else:
+                    disctCorretEnglish[UltTextEnglish].append(text)
+
+            # Processa jsonListPortugues mesmo que jsonListEnglish esteja vazio
+            for text in jsonListPortugues[0]:
+                if text[-1] == ":":
+                    disctCorretPortugues[text] = []
+                    UltTextPortugues = text
+                else:
+                    disctCorretPortugues[UltTextPortugues].append(text)
+
+            # Atualiza disctCorretPortugues com dados de disctCorretEnglish
+            for i, val in disctCorretEnglish.items():
+                if i == "Entry term(s):":
+                    disctCorretPortugues[i] = val
+
+        else:
+            # Processa jsonListPortugues caso jsonListEnglish esteja vazio
+            for text in jsonListPortugues[0]:
+                if text[-1] == ":":
+                    disctCorretPortugues[text] = []
+                    UltTextPortugues = text
+                else:
+                    disctCorretPortugues[UltTextPortugues].append(text)
+
         stringCorrect = ''
         MH = ''
-    
+
+        # Monta a string de resultado baseado em disctCorretPortugues
         for i, val in disctCorretPortugues.items():
             if i == "Descritor em português:":
                 stringCorrect += (f'MH:"{val[0]}" ')
             elif i == 'Código(s) hierárquico(s):':
-                MH = (f'OR MH:{val[0]}$')
+                for item in val:
+                    MH += (f'OR MH:{item}$ ')
             elif i == "Descritor em inglês:":
                 stringCorrect += (f'OR ({val[0]}) ')
             elif i == 'Descritor em espanhol:' and spanishDescription == 'true':
@@ -125,12 +139,12 @@ def process():
                     stringCorrect += (f'OR ({item}) ')
             else:
                 continue
-                
+
         jsonListEnglish.clear()
         jsonListPortugues.clear()
 
         return jsonify({"result": f"{stringCorrect + MH }"})
-        
+
     # Caso `typeSearch` não seja '1'
     return jsonify({"error": "Invalid typeSearch value. Ensure it is '1'."}), 400
 
