@@ -31,6 +31,82 @@ def search_and_extract(search_term, language):
     else:
         return {"error": f"Failed to retrieve search results. Status code: {response.status_code}"}
 
+def search_and_extract_PUBMED(search_url):
+    # Enviar a solicitação GET
+    response = requests.get(search_url)
+
+    # Verifique se a solicitação foi bem-sucedida
+    if response.status_code == 200:
+        # Fazer o parsing do conteúdo HTML
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # Encontrar a div com a classe 'rprt abstract'
+        div_class = 'rprt abstract'
+        div = soup.find('div', class_=div_class)  # Encontrar a div pela classe
+
+        if div:
+            # Extrair todo o texto dentro da div
+            text_content = div.get_text(separator='\n', strip=True)
+
+            # Separar o texto em uma lista de termos usando o caractere de nova linha
+            terms_list = text_content.split('\n')
+
+            return terms_list
+        else:
+            return "Div with class 'rprt abstract' not found."
+    else:
+        return f"Failed to retrieve search results. Status code: {response.status_code}"
+
+@app.route('/searchPubMed', methods=['GET'])
+def searchPubMed():
+    search_term = request.args.get('term')
+    if not search_term:
+        return jsonify({"error": "Nenhum termo de pesquisa fornecido"}), 400
+        
+    if search_term[:34] == "https://www.ncbi.nlm.nih.gov/mesh/":    
+
+        # Realiza a busca
+        terms_list = search_and_extract_PUBMED(search_term)
+    
+        if isinstance(terms_list, str):
+            return jsonify({"error": terms_list}), 404
+    
+        # Processa os termos e formata a r0esposta
+        disctCorrect = {"Components":[]}
+        UltText = ''
+    
+        for text in terms_list:
+            if text == "Emigration and Immigration":
+                disctCorrect['Components'].append(text)
+            elif text[-1] == ":":
+                disctCorrect[text] = []
+                UltText = text
+            elif UltText == '':
+                disctCorrect['Components'].append(text)
+            else:
+                disctCorrect[UltText].append(text)
+    
+        stringCorrect = ''
+        MH = ''
+    
+        for i, val in disctCorrect.items():
+            if i == "Components":
+                for i in val:
+                    stringCorrect += (f'"{i}"[Mesh] ')
+                    break
+            elif i == "Entry Terms:":
+                for i in val:
+                    stringCorrect += (f'OR ({i}) ')
+            else:
+                continue
+    
+        return jsonify({
+            # "formatted_data": disctCorrect,
+            "result": stringCorrect + MH
+        })
+    else:
+        return jsonify({"error": "O link não está correto, verifique o link e tente novamente."}), 400;
+
 @app.route('/search', methods=['GET'])
 def search():
     search_term = request.args.get('search_term')
@@ -60,7 +136,7 @@ def search():
             else:
                 jsonListEnglish.clear()
                 jsonListPortugues.clear()
-                return jsonify({"error": "The link is not correct, please check the link and try again."}), 400
+                return jsonify({"error": "O link não está correto, verifique o link e tente novamente."}), 400
         except requests.RequestException as e:
             jsonListEnglish.clear()
             jsonListPortugues.clear()
@@ -68,7 +144,7 @@ def search():
     else:
         jsonListEnglish.clear()
         jsonListPortugues.clear()
-        return jsonify({"error": "The link is not correct, please check the link and try again."}), 400
+        return jsonify({"error": "O link não está correto, verifique o link e tente novamente."}), 400
 
 @app.route('/process', methods=['GET'])
 def process():
