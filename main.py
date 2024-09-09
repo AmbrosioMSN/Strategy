@@ -96,7 +96,10 @@ def searchPubMed():
                     break
             elif i == "Entry Terms:":
                 for i in val:
-                    stringCorrect += (f'OR ({i}) ')
+                    if i == 'All MeSH Categories':
+                        break
+                    else:  
+                        stringCorrect += (f'OR ({i}) ')
             else:
                 continue
     
