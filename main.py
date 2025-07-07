@@ -10,12 +10,14 @@ jsonListEnglish = []
 jsonListPortugues = []
 
 def search_and_extract(search_term, language):
-    search_url = search_term
-    response = requests.get(search_url)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    }
+    response = requests.get(search_term, headers=headers)
 
     if response.status_code == 200:
         soup = BeautifulSoup(response.text, 'html.parser')
-        table_div = soup.find('table')  # Ajuste o seletor conforme necessário
+        table_div = soup.find('table')
 
         if table_div:
             text_content = table_div.get_text(separator='\n', strip=True)
@@ -32,25 +34,18 @@ def search_and_extract(search_term, language):
         return {"error": f"Failed to retrieve search results. Status code: {response.status_code}"}
 
 def search_and_extract_PUBMED(search_url):
-    # Enviar a solicitação GET
-    response = requests.get(search_url)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    }
+    response = requests.get(search_url, headers=headers)
 
-    # Verifique se a solicitação foi bem-sucedida
     if response.status_code == 200:
-        # Fazer o parsing do conteúdo HTML
         soup = BeautifulSoup(response.text, 'html.parser')
-
-        # Encontrar a div com a classe 'rprt abstract'
-        div_class = 'rprt abstract'
-        div = soup.find('div', class_=div_class)  # Encontrar a div pela classe
+        div = soup.find('div', class_='rprt abstract')
 
         if div:
-            # Extrair todo o texto dentro da div
             text_content = div.get_text(separator='\n', strip=True)
-
-            # Separar o texto em uma lista de termos usando o caractere de nova linha
             terms_list = text_content.split('\n')
-
             return terms_list
         else:
             return "Div with class 'rprt abstract' not found."
@@ -62,19 +57,16 @@ def searchPubMed():
     search_term = request.args.get('term')
     if not search_term:
         return jsonify({"error": "Nenhum termo de pesquisa fornecido"}), 400
-        
-    if search_term[:34] == "https://www.ncbi.nlm.nih.gov/mesh/":    
 
-        # Realiza a busca
+    if search_term.startswith("https://www.ncbi.nlm.nih.gov/mesh/"):
         terms_list = search_and_extract_PUBMED(search_term)
-    
+
         if isinstance(terms_list, str):
             return jsonify({"error": terms_list}), 404
-    
-        # Processa os termos e formata a r0esposta
-        disctCorrect = {"Components":[]}
+
+        disctCorrect = {"Components": []}
         UltText = ''
-    
+
         for text in terms_list:
             if text == "Emigration and Immigration":
                 disctCorrect['Components'].append(text)
@@ -85,10 +77,10 @@ def searchPubMed():
                 disctCorrect['Components'].append(text)
             else:
                 disctCorrect[UltText].append(text)
-    
+
         stringCorrect = ''
         MH = ''
-    
+
         for i, val in disctCorrect.items():
             if i == "Components":
                 for i in val:
@@ -98,31 +90,30 @@ def searchPubMed():
                 for i in val:
                     if i == 'All MeSH Categories':
                         break
-                    else:  
+                    else:
                         stringCorrect += (f'OR ({i}) ')
             else:
                 continue
-    
+
         return jsonify({
-            # "formatted_data": disctCorrect,
             "result": stringCorrect + MH
         })
     else:
-        return jsonify({"error": "O link não está correto, verifique o link e tente novamente."}), 400;
+        return jsonify({"error": "O link não está correto, verifique o link e tente novamente."}), 400
 
 @app.route('/search', methods=['GET'])
 def search():
     search_term = request.args.get('search_term')
     language = request.args.get('language')
 
-    # Verificar se search_term começa com a URL esperada
-    if search_term[:25] == "https://decs.bvsalud.org/":
+    if search_term.startswith("https://decs.bvsalud.org/"):
         try:
-            # Fazer uma solicitação HTTP para verificar a URL
-            response = requests.get(search_term)
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+            }
+            response = requests.get(search_term, headers=headers)
 
             if response.status_code == 200:
-                # Lógica para processar a pesquisa
                 if not search_term or not language:
                     return jsonify({"error": "Missing search_term or language"}), 400
 
@@ -161,7 +152,6 @@ def process():
         UltTextEnglish = ''
         UltTextPortugues = ''
 
-        # Verifica se jsonListEnglish não está vazio antes de processar
         if jsonListEnglish:
             for text in jsonListEnglish[0]:
                 if text[-1] == ":":
@@ -170,7 +160,6 @@ def process():
                 else:
                     disctCorretEnglish[UltTextEnglish].append(text)
 
-            # Processa jsonListPortugues mesmo que jsonListEnglish esteja vazio
             for text in jsonListPortugues[0]:
                 if text[-1] == ":":
                     disctCorretPortugues[text] = []
@@ -178,13 +167,11 @@ def process():
                 else:
                     disctCorretPortugues[UltTextPortugues].append(text)
 
-            # Atualiza disctCorretPortugues com dados de disctCorretEnglish
             for i, val in disctCorretEnglish.items():
                 if i == "Entry term(s):":
                     disctCorretPortugues[i] = val
 
         else:
-            # Processa jsonListPortugues caso jsonListEnglish esteja vazio
             for text in jsonListPortugues[0]:
                 if text[-1] == ":":
                     disctCorretPortugues[text] = []
@@ -195,7 +182,6 @@ def process():
         stringCorrect = ''
         MH = ''
 
-        # Monta a string de resultado baseado em disctCorretPortugues
         for i, val in disctCorretPortugues.items():
             if i == "Descritor em português:":
                 stringCorrect += (f'MH:"{val[0]}" ')
@@ -206,25 +192,20 @@ def process():
                 stringCorrect += (f'OR ({val[0]}) ')
             elif i == 'Descritor em espanhol:' and spanishDescription == 'true':
                 stringCorrect += (f'OR ({val[0]}) ')
-                continue
             elif i == 'Descritor em francês:' and frenchDescription == 'true':
                 stringCorrect += (f'OR ({val[0]}) ')
-                continue
             elif i == "Termo(s) alternativo(s):":
                 for item in val:
                     stringCorrect += (f'OR ({item}) ')
             elif i == "Entry term(s):":
                 for item in val:
                     stringCorrect += (f'OR ({item}) ')
-            else:
-                continue
 
         jsonListEnglish.clear()
         jsonListPortugues.clear()
 
-        return jsonify({"result": f"{stringCorrect + MH }"})
+        return jsonify({"result": f"{stringCorrect + MH}"})
 
-    # Caso `typeSearch` não seja '1'
     return jsonify({"error": "Invalid typeSearch value. Ensure it is '1'."}), 400
 
 if __name__ == '__main__':
